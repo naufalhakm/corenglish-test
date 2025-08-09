@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: task_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-corenglish}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-corenglish}
+      POSTGRES_DB: ${DB_NAME:-corenglish}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - task_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-corenglish}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: task_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - task_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task_api
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - APP_ENV=${APP_ENV:-development}
+      - APP_PORT=${APP_PORT:-3000}
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-corenglish}
+      - DB_PASSWORD=${DB_PASSWORD:-corenglish}
+      - DB_NAME=${DB_NAME:-corenglish}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - task_network
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  task_network:
+    driver: bridge
