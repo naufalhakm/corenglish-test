@@ -46,10 +46,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            echo "Make sure Docker is installed"
             docker --version
+
+            echo "Make sure Docker Compose is installed"
             docker compose --version
+
+            echo "Navigating to app directory"
             cd app
+
+            echo "Pulling latest changes from Git"
+            git reset --hard
             git pull origin main
+
+            echo "Pulling latest Docker images"
             docker compose pull
             docker compose up -d --force-recreate
             docker ps -a

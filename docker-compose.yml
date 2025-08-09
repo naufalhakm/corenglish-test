@@ -36,9 +36,7 @@ services:
     restart: always
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME}/corenglish:latest
     container_name: task_api
     ports:
       - "${APP_PORT:-3000}:3000"
