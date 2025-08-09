@@ -51,7 +51,6 @@ GET /health - Health check endpoint
 ### Prerequisites
 - Docker and Docker Compose
 - Go 1.24 (for local development)
-- Make (optional, for using Makefile commands)
 
 ### Using Docker (Recommended)
 
