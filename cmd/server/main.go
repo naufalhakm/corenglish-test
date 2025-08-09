@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go-corenglish/internal/config"
 	"go-corenglish/internal/handlers"
 	"go-corenglish/internal/middleware"
@@ -74,6 +75,13 @@ func main() {
 			"timestamp": time.Now().UTC(),
 			"service":   "go-corenglish",
 		})
+	})
+
+	router.GET("/", func(ctx *gin.Context) {
+		currentYear := time.Now().Year()
+		message := fmt.Sprintf("COREenglish API task %d", currentYear)
+
+		ctx.JSON(http.StatusOK, message)
 	})
 
 	// API routes
