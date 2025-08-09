@@ -46,8 +46,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
+            docker --version
+            docker compose --version
             cd app
             git pull origin main
             docker compose pull
             docker compose up -d --force-recreate
-            docker system prune -af
+            docker ps -a
