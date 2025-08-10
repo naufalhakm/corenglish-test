@@ -9,6 +9,7 @@ import (
 	"go-corenglish/internal/repositories"
 	"go-corenglish/internal/services"
 	"go-corenglish/pkg/database"
+	"go-corenglish/pkg/token"
 	"log"
 	"net/http"
 	"os"
@@ -45,11 +46,13 @@ func main() {
 	redisClient := database.ConnectRedis(cfg, logger)
 	defer redisClient.Close()
 
+	tokenManager := token.NewTokenManager(cfg.JWTSecret, cfg.JWTExpiry)
+
 	taskRepo := repositories.NewTaskRepository(db, logger)
 	userRepo := repositories.NewUserRepository(db, logger)
 
 	taskService := services.NewTaskService(taskRepo, logger, redisClient)
-	authService := services.NewAuthService(userRepo, cfg, logger)
+	authService := services.NewAuthService(userRepo, cfg, logger, tokenManager)
 
 	taskHandler := handlers.NewTaskHandler(taskService, logger)
 	authHandler := handlers.NewAuthHandler(authService, logger)
@@ -96,7 +99,7 @@ func main() {
 
 		// Task routes (protected)
 		tasks := v1.Group("/tasks")
-		tasks.Use(middleware.AuthMiddleware(cfg.JWTSecret, logger))
+		tasks.Use(middleware.AuthMiddleware(tokenManager, logger))
 		{
 			tasks.POST("", taskHandler.CreateTask)
 			tasks.GET("", taskHandler.GetTasks)

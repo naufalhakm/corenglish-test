@@ -18,18 +18,18 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo  repositories.UserRepository
-	config    *config.Config
-	logger    *logrus.Logger
-	jwtSecret []byte
+	userRepo   repositories.UserRepository
+	config     *config.Config
+	logger     *logrus.Logger
+	jwtManager *token.TokenManager
 }
 
-func NewAuthService(userRepo repositories.UserRepository, config *config.Config, logger *logrus.Logger) AuthService {
+func NewAuthService(userRepo repositories.UserRepository, config *config.Config, logger *logrus.Logger, jwtManager *token.TokenManager) AuthService {
 	return &authService{
-		userRepo:  userRepo,
-		config:    config,
-		logger:    logger,
-		jwtSecret: []byte(config.JWTSecret),
+		userRepo:   userRepo,
+		config:     config,
+		logger:     logger,
+		jwtManager: jwtManager,
 	}
 }
 
@@ -66,7 +66,7 @@ func (s *authService) Register(req *params.RegisterRequest) (*params.AuthRespons
 	}
 
 	// Generate JWT token
-	token, err := token.GenerateToken(user.ID)
+	token, err := s.jwtManager.GenerateToken(user.ID)
 	if err != nil {
 		s.logger.WithError(err).WithField("user_id", user.ID).Error("Failed to generate token")
 		return nil, response.GeneralError("failed to generate token")
@@ -106,7 +106,7 @@ func (s *authService) Login(req *params.LoginRequest) (*params.AuthResponse, *re
 	}
 
 	// Generate JWT token
-	token, err := token.GenerateToken(user.ID)
+	token, err := s.jwtManager.GenerateToken(user.ID)
 	if err != nil {
 		s.logger.WithError(err).WithField("user_id", user.ID).Error("Failed to generate token")
 		return nil, response.GeneralError("failed to generate token")

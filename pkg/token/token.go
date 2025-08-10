@@ -10,35 +10,41 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	TOKEN_Key    = "FSUnIQPYBvUeUbo6loiJp4HVk515eA7i"
-	TOKEN_Expiry = 24 * time.Hour
-)
+type TokenManager struct {
+	secret string
+	expiry time.Duration
+}
 
-func GenerateToken(userID uuid.UUID) (string, error) {
+func NewTokenManager(secret string, expiryHours int) *TokenManager {
+	return &TokenManager{
+		secret: secret,
+		expiry: time.Duration(expiryHours) * time.Hour,
+	}
+}
+
+func (tm *TokenManager) GenerateToken(userID uuid.UUID) (string, error) {
 	payload := Token{
 		AuthId:  userID.String(),
-		Expired: time.Now().Add(TOKEN_Expiry),
+		Expired: time.Now().Add(tm.expiry),
 	}
 	claims := jwt.MapClaims{
 		"payload": payload,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString([]byte(TOKEN_Key))
+	tokenStr, err := token.SignedString([]byte(tm.secret))
 	if err != nil {
 		return "", err
 	}
 	return tokenStr, nil
 }
 
-func ValidateToken(tokenString string) (*Token, error) {
+func (tm *TokenManager) ValidateToken(tokenString string) (*Token, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-
-		return []byte(TOKEN_Key), nil
+		return []byte(tm.secret), nil
 	})
 
 	if err != nil {
@@ -49,7 +55,6 @@ func ValidateToken(tokenString string) (*Token, error) {
 		payloadInterface := claims["payload"]
 
 		payloadToken := Token{}
-
 		payloadByte, err := json.Marshal(payloadInterface)
 		if err != nil {
 			return nil, err
@@ -58,12 +63,10 @@ func ValidateToken(tokenString string) (*Token, error) {
 		if err != nil {
 			return nil, err
 		}
-		now := time.Now()
-		if now.After(payloadToken.Expired) {
-			return nil, errors.New("Token Expired")
+		if time.Now().After(payloadToken.Expired) {
+			return nil, errors.New("token expired")
 		}
 		return &payloadToken, nil
-	} else {
-		return nil, errors.New("Unauthorized")
 	}
+	return nil, errors.New("unauthorized")
 }

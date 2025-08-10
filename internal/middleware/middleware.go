@@ -101,7 +101,7 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 }
 
 // AuthMiddleware validates JWT tokens
-func AuthMiddleware(jwtSecret string, logger *logrus.Logger) gin.HandlerFunc {
+func AuthMiddleware(tm *token.TokenManager, logger *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -118,7 +118,7 @@ func AuthMiddleware(jwtSecret string, logger *logrus.Logger) gin.HandlerFunc {
 			return
 		}
 
-		payload, err := token.ValidateToken(bearerToken[1])
+		payload, err := tm.ValidateToken(bearerToken[1])
 		if err != nil {
 			resp := response.UnauthorizedErrorWithAdditionalInfo(err.Error())
 			c.AbortWithStatusJSON(resp.StatusCode, resp)

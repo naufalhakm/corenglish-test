@@ -29,6 +29,7 @@ type Config struct {
 
 	// Security settings
 	JWTSecret  string
+	JWTExpiry  int
 	BcryptCost int
 
 	// Rate limiting settings
@@ -58,6 +59,10 @@ func Load() (*Config, error) {
 
 		RateLimitRequests: getEnvAsInt("RATE_LIMIT_REQUESTS", 100),
 		RateLimitWindow:   getEnvAsInt("RATE_LIMIT_WINDOW", 60),
+
+		JWTSecret:  getEnv("JWT_SECRET", "default-secret-key"),
+		JWTExpiry:  getEnvAsInt("JWT_EXPIRY", 24),
+		BcryptCost: getEnvAsInt("BCRYPT_COST", 10),
 	}
 
 	return cfg, nil
