@@ -54,7 +54,7 @@ func (s *taskService) CreateTask(userID uuid.UUID, req *params.CreateTaskRequest
 		return nil, response.RepositoryError("failed to create task")
 	}
 
-	s.invalidateUserTasksCache(userID)
+	s.publishInvalidateUserTasksCache(userID)
 
 	s.logger.WithFields(logrus.Fields{
 		"task_id": task.ID,
@@ -182,7 +182,7 @@ func (s *taskService) UpdateTask(taskID uuid.UUID, userID uuid.UUID, req *params
 		return nil, response.RepositoryError("failed to update task")
 	}
 
-	s.invalidateUserTasksCache(userID)
+	s.publishInvalidateUserTasksCache(userID)
 
 	s.logger.WithFields(logrus.Fields{
 		"task_id": taskID,
@@ -210,7 +210,7 @@ func (s *taskService) DeleteTask(taskID uuid.UUID, userID uuid.UUID) *response.C
 		return response.RepositoryError("failed to delete task")
 	}
 
-	s.invalidateUserTasksCache(userID)
+	s.publishInvalidateUserTasksCache(userID)
 
 	s.logger.WithFields(logrus.Fields{
 		"task_id": taskID,
@@ -224,11 +224,20 @@ func (s *taskService) cacheKeyTasks(userID uuid.UUID, status string, page, limit
 	return fmt.Sprintf("tasks:%s:%s:%d:%d", userID.String(), status, page, limit)
 }
 
-func (s *taskService) invalidateUserTasksCache(userID uuid.UUID) {
+func (s *taskService) publishInvalidateUserTasksCache(userID uuid.UUID) {
 	ctx := context.Background()
-	pattern := fmt.Sprintf("tasks:%s:*", userID.String())
-	iter := s.cache.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		_ = s.cache.Del(ctx, iter.Val()).Err()
+
+	msg := map[string]string{
+		"user_id": userID.String(),
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to marshal cache invalidation message")
+		return
+	}
+
+	if err := s.cache.Publish(ctx, "tasks:invalidate", data).Err(); err != nil {
+		s.logger.WithError(err).Error("Failed to publish cache invalidation event")
 	}
 }
