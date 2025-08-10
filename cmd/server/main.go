@@ -48,7 +48,7 @@ func main() {
 	taskRepo := repositories.NewTaskRepository(db, logger)
 	userRepo := repositories.NewUserRepository(db, logger)
 
-	taskService := services.NewTaskService(taskRepo, logger)
+	taskService := services.NewTaskService(taskRepo, logger, redisClient)
 	authService := services.NewAuthService(userRepo, cfg, logger)
 
 	taskHandler := handlers.NewTaskHandler(taskService, logger)

@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"go-corenglish/internal/commons/response"
 	"go-corenglish/internal/enum"
@@ -8,10 +10,14 @@ import (
 	"go-corenglish/internal/params"
 	"go-corenglish/internal/repositories"
 	"math"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
+
+const cacheTTL = 60 * time.Second
 
 type TaskService interface {
 	CreateTask(userID uuid.UUID, req *params.CreateTaskRequest) (*params.TaskResponse, *response.CustomError)
@@ -24,12 +30,14 @@ type TaskService interface {
 type taskService struct {
 	taskRepo repositories.TaskRepository
 	logger   *logrus.Logger
+	cache    *redis.Client
 }
 
-func NewTaskService(taskRepo repositories.TaskRepository, logger *logrus.Logger) TaskService {
+func NewTaskService(taskRepo repositories.TaskRepository, logger *logrus.Logger, cache *redis.Client) TaskService {
 	return &taskService{
 		taskRepo: taskRepo,
 		logger:   logger,
+		cache:    cache,
 	}
 }
 
@@ -45,6 +53,8 @@ func (s *taskService) CreateTask(userID uuid.UUID, req *params.CreateTaskRequest
 		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to create task")
 		return nil, response.RepositoryError("failed to create task")
 	}
+
+	s.invalidateUserTasksCache(userID)
 
 	s.logger.WithFields(logrus.Fields{
 		"task_id": task.ID,
@@ -83,16 +93,20 @@ func (s *taskService) GetTask(taskID uuid.UUID, userID uuid.UUID) (*params.TaskR
 }
 
 func (s *taskService) GetTasks(userID uuid.UUID, status string, page, limit int) (*params.TasksResponse, *response.CustomError) {
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
-
 	if status != "" {
 		if !enum.TaskStatus(status).IsValid() {
 			return nil, response.BadRequestError(fmt.Sprintf("invalid status: %s", status))
+		}
+	}
+
+	ctx := context.Background()
+	key := s.cacheKeyTasks(userID, status, page, limit)
+
+	if val, err := s.cache.Get(ctx, key).Result(); err == nil {
+		var cached params.TasksResponse
+		if json.Unmarshal([]byte(val), &cached) == nil {
+			s.logger.WithField("cache_key", key).Info("Cache hit for tasks list")
+			return &cached, nil
 		}
 	}
 
@@ -122,6 +136,10 @@ func (s *taskService) GetTasks(userID uuid.UUID, status string, page, limit int)
 		Page:       page,
 		Limit:      limit,
 		TotalPages: totalPages,
+	}
+
+	if data, err := json.Marshal(response); err == nil {
+		_ = s.cache.Set(ctx, key, data, cacheTTL).Err()
 	}
 
 	s.logger.WithFields(logrus.Fields{
@@ -164,6 +182,8 @@ func (s *taskService) UpdateTask(taskID uuid.UUID, userID uuid.UUID, req *params
 		return nil, response.RepositoryError("failed to update task")
 	}
 
+	s.invalidateUserTasksCache(userID)
+
 	s.logger.WithFields(logrus.Fields{
 		"task_id": taskID,
 		"user_id": userID,
@@ -190,10 +210,25 @@ func (s *taskService) DeleteTask(taskID uuid.UUID, userID uuid.UUID) *response.C
 		return response.RepositoryError("failed to delete task")
 	}
 
+	s.invalidateUserTasksCache(userID)
+
 	s.logger.WithFields(logrus.Fields{
 		"task_id": taskID,
 		"user_id": userID,
 	}).Info("Task deleted successfully")
 
 	return nil
+}
+
+func (s *taskService) cacheKeyTasks(userID uuid.UUID, status string, page, limit int) string {
+	return fmt.Sprintf("tasks:%s:%s:%d:%d", userID.String(), status, page, limit)
+}
+
+func (s *taskService) invalidateUserTasksCache(userID uuid.UUID) {
+	ctx := context.Background()
+	pattern := fmt.Sprintf("tasks:%s:*", userID.String())
+	iter := s.cache.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		_ = s.cache.Del(ctx, iter.Val()).Err()
+	}
 }
