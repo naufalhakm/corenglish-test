@@ -9,7 +9,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./cmd/server
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o worker ./cmd/worker
 
 FROM alpine:latest
 
@@ -18,9 +20,10 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 RUN mkdir -p logs
 
-COPY --from=builder /app/main .
+COPY --from=builder /app/server .
+COPY --from=builder /app/worker .
 COPY --from=builder /app/pkg/database/migrations /app/pkg/database/migrations
 
 EXPOSE 3000
 
-CMD ["./main"]
+CMD ["./server"]

@@ -50,9 +50,11 @@ services:
       - DB_NAME=${DB_NAME:-corenglish}
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
       - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+      - JWT_SECRET=${JWT_SECRET:-FSUnIQPYBvUeUbo6loiJp4HVk515eA7i}
+      - JWT_EXPIRY=${JWT_EXPIRY:-24}
+      - BCRYPT_COST=${BCRYPT_COST:-10}
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +64,28 @@ services:
       - task_network
     volumes:
       - ./logs:/app/logs
+    restart: unless-stopped
+
+  worker:
+    image: ${DOCKERHUB_USERNAME:-naufalhakm}/corenglish:latest
+    container_name: task_worker
+    command: ["./worker"]
+    environment:
+      - APP_ENV=${APP_ENV:-development}
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-corenglish}
+      - DB_PASSWORD=${DB_PASSWORD:-corenglish}
+      - DB_NAME=${DB_NAME:-corenglish}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - task_network
     restart: unless-stopped
 
 volumes:
