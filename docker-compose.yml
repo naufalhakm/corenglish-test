@@ -40,21 +40,8 @@ services:
     container_name: task_api
     ports:
       - "${APP_PORT:-3000}:3000"
-    environment:
-      - APP_ENV=${APP_ENV:-development}
-      - APP_PORT=${APP_PORT:-3000}
-      - DB_HOST=db
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-corenglish}
-      - DB_PASSWORD=${DB_PASSWORD:-corenglish}
-      - DB_NAME=${DB_NAME:-corenglish}
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
-      - JWT_SECRET=${JWT_SECRET:-FSUnIQPYBvUeUbo6loiJp4HVk515eA7i}
-      - JWT_EXPIRY=${JWT_EXPIRY:-24}
-      - BCRYPT_COST=${BCRYPT_COST:-10}
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -70,15 +57,8 @@ services:
     image: ${DOCKERHUB_USERNAME:-naufalhakm}/corenglish:latest
     container_name: task_worker
     command: ["./worker"]
-    environment:
-      - APP_ENV=${APP_ENV:-development}
-      - DB_HOST=db
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-corenglish}
-      - DB_PASSWORD=${DB_PASSWORD:-corenglish}
-      - DB_NAME=${DB_NAME:-corenglish}
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
